@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 18, "column": 0}, "map": {"version":3,"sources":["file:///home/gayathri/Documents/ufuhi/frontend/app/markets/page.tsx"],"sourcesContent":["\nexport default function Page() {\n    return <div className=\"flex flex-row flex-1\">\n        <div className=\"flex flex-col justify-center items-center flex-1 pt-[100px]\">\n            Markets page\n        </div>\n    </div>\n}"],"names":[],"mappings":";;;;;;AACe,SAAS;IACpB,qBAAO,ibAAC;QAAI,WAAU;kBAClB,cAAA,ibAAC;YAAI,WAAU;sBAA8D;;;;;;;;;;;AAIrF"}}]
+}

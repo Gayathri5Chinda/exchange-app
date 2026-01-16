@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 18, "column": 0}, "map": {"version":3,"sources":["file:///home/gayathri/Documents/ufuhi/frontend/app/page.tsx"],"sourcesContent":["import Image from \"next/image\";\n\nexport default function Home() {\n  return (\n    <main className=\"flex min-h-screen flex-col items-center justify-between p-24\">\n      Landing page\n    </main>\n  );\n}"],"names":[],"mappings":";;;;;;AAEe,SAAS;IACtB,qBACE,ibAAC;QAAK,WAAU;kBAA+D;;;;;;AAInF"}}]
+}
