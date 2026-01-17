@@ -14,11 +14,11 @@ pnpm install
 Ensure Redis and TimescaleDB are running locally or update the connection strings.  
 Navigate to the root directory and run: 
 ```
-yarn start
+pnpm start
 ```
 Run tests with: (in each sub-directory)  
 ```
-yarn test
+pnpm test
 ```
 
 ## API Server
