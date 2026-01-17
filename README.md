@@ -4,42 +4,40 @@ Full Website:
 CryptoExchange is split up into multiple separate deployables: a web client, API server, Engine, WebSocket server, DB Processor, and a market maker.  
 
 # How to run the application:
-Navigate to the frontend directory and run: yarn install  
-Navigate to the api directory and run: yarn install  
-Navigate to the engine directory and run: yarn install  
-Navigate to the ws directory and run: yarn install  
-Navigate to the db-processor directory and run: yarn install  
-Navigate to the mm directory and run: yarn install  
+Navigate to the frontend directory and run: pnpm install  
+Navigate to the api directory and run: pnpm install  
+Navigate to the engine directory and run: pnpm install  
+Navigate to the ws directory and run: pnpm install  
+Navigate to the db-processor directory and run: pnpm install  
+Navigate to the mm directory and run: pnpm install  
 Ensure Redis and TimescaleDB are running locally or update the connection strings.  
 Navigate to the root directory and run: yarn start. This will spin up all services.  
 Run tests with: yarn test in each sub-directory.  
 
 # API Server
-Tech Used: Express, Node.js  
-Why was this stack chosen?  
-The API server acts as the main HTTP interface for users to interact with the exchange. It handles authentication, order placement, cancellations, and account queries. Express was chosen for its lightweight nature and robust middleware ecosystem, allowing us to easily implement rate limiting, authentication, and request validation. The API communicates with the Engine via Redis queues to ensure orders are processed asynchronously and reliably.  
-Data Flow:  
+Tech Used: Express, Node.js    
+Why was this stack chosen?      
+The API server acts as the main HTTP interface for users to interact with the exchange. It handles authentication, order placement, cancellations, and account queries. Express was chosen for its lightweight nature and robust middleware ecosystem, allowing us to easily implement rate limiting, authentication, and request validation.
+Data Flow:    
 When a user places an order through the API, the request is validated and authenticated. The order details are then pushed to a Redis queue where the Engine picks it up for processing. Once the Engine processes the order, it publishes the result back through Redis pub/sub, which the API server listens to in order to respond to the client. For real-time updates, users are directed to subscribe via the WebSocket server.  
 
 # Engine
-Tech Used: Node.js, Redis
-Why was this stack chosen?
-The Engine is the heart of the exchange, responsible for maintaining orderbooks for various trading pairs and executing trades. It stores user balances and open orders entirely in memory for blazing-fast order matching. Node.js was chosen for its event-driven architecture, which is perfect for handling high-frequency order matching operations.
-Redis serves as both a message queue (to receive orders from the API) and a pub/sub mechanism (to broadcast trade executions and orderbook updates to other services). Keeping state in memory allows for microsecond-level latency in order matching, which is critical for a competitive exchange.
-Data Flow:
-The Engine continuously listens to Redis queues for incoming orders. When an order arrives, it's matched against the existing orderbook using a price-time priority algorithm. If a match is found, the trade is executed immediately, balances are updated in memory, and the trade details are published to Redis pub/sub. The DB Processor picks up these events for persistence, while the WebSocket server broadcasts them to connected clients.
+Tech Used: Node.js, Redis  
+Why was this stack chosen?  
+The Engine is the heart of the exchange, responsible for maintaining orderbooks for various trading pairs and executing trades. It stores user balances and open orders entirely in memory for blazing-fast order matching. Node.js was chosen for its event-driven architecture, which is perfect for handling high-frequency order matching operations.  
+Data Flow:  
+The Engine continuously listens to Redis queues for incoming orders. When an order arrives, it's matched against the existing orderbook using a price-time priority algorithm. If a match is found, the trade is executed immediately, balances are updated in memory, and the trade details are published to Redis pub/sub. The DB Processor picks up these events for persistence, while the WebSocket server broadcasts them to connected clients.  
 
 # WebSocket Server
-Tech Used: WebSocket (ws library), Node.js, Redis
-Why was this stack chosen?
-Real-time data is essential for any trading platform. The WebSocket server allows users to subscribe to live orderbook updates, recent trades, and their own order status changes. The native ws library was chosen for its performance and low overhead.
-The WebSocket server doesn't maintain any trading logic itself—it simply subscribes to Redis pub/sub channels where the Engine broadcasts events. This separation of concerns allows the WebSocket server to scale horizontally without worrying about state synchronization.
-Data Flow:
-When a user connects to the WebSocket server, they can subscribe to specific channels (e.g., orderbook.BTC-USD, trades.ETH-USD). The WebSocket server listens to the corresponding Redis pub/sub channels and forwards any messages to subscribed clients in real-time. This architecture ensures that all connected users receive updates simultaneously as soon as the Engine processes them.
+Tech Used: WebSocket (ws library), Node.js, Redis  
+Why was this stack chosen?  
+Real-time data is essential for any trading platform. The WebSocket server allows users to subscribe to live orderbook updates, recent trades, and their own order status changes. The native ws library was chosen for its performance and low overhead.  
+Data Flow:  
+When a user connects to the WebSocket server, they can subscribe to specific channels (e.g., orderbook.BTC-USD, trades.ETH-USD). The WebSocket server listens to the corresponding Redis pub/sub channels and forwards any messages to subscribed clients in real-time. This architecture ensures that all connected users receive updates simultaneously as soon as the Engine processes them.  
 
 # DB Processor
-Tech Used: Node.js, Redis, TimescaleDB
-Data Flow:
+Tech Used: Node.js, Redis, TimescaleDB  
+Data Flow:  
 The DB Processor listens to Redis pub/sub channels for trade executions, order placements, cancellations, and balance updates. These events are batched and written to TimescaleDB. Additionally, the DB Processor generates kline (candlestick) data by aggregating trades into time buckets (1m, 5m, 1h, etc.), which are used by the frontend for charting.
 
 # Market Maker (mm)
@@ -49,30 +47,29 @@ The market maker periodically generates random orders within a configured spread
 
 # Redis
 Tech Used: Redis
-Redis serves two critical functions in the architecture:
-
-Message Queue: The API server and market maker push orders to Redis queues, which the Engine consumes. This decouples the services and allows for asynchronous processing.
-Pub/Sub: The Engine publishes trade executions and orderbook updates to Redis channels. The WebSocket server and DB Processor subscribe to these channels to broadcast updates and persist data respectively.
+Redis serves two critical functions in the architecture:   
+Message Queue: The API server and market maker push orders to Redis queues, which the Engine consumes. This decouples the services and allows for asynchronous processing.  
+Pub/Sub: The Engine publishes trade executions and orderbook updates to Redis channels. The WebSocket server and DB Processor subscribe to these channels to broadcast updates and persist data respectively.  
 
 # TimescaleDB
-Tech Used: TimescaleDB (PostgreSQL extension)
-TimescaleDB stores all historical trading data, including:
+Tech Used: TimescaleDB (PostgreSQL extension)  
+TimescaleDB stores all historical trading data, including:  
 
-Trade executions
-Order history
-Balance changes
-Kline/candlestick data
+Trade executions  
+Order history  
+Balance changes  
+Kline/candlestick data  
 
-The DB Processor aggregates trades into time-bucketed klines (1 minute, 5 minute, 1 hour, etc.) using TimescaleDB's continuous aggregates feature. This allows the frontend to efficiently query and display price charts without computing aggregations on the fly.
+The DB Processor aggregates trades into time-bucketed klines (1 minute, 5 minute, 1 hour, etc.) using TimescaleDB's continuous aggregates feature. This allows the frontend to efficiently query and display price charts without computing aggregations on the fly.  
 
 # Architecture Overview
-User → API Server → Redis Queue → Engine (in-memory orderbook)
-                                      ↓
-                                 Redis Pub/Sub
-                                   ↙     ↘
-                    WebSocket Server   DB Processor
-                           ↓                ↓
-                        User          TimescaleDB
+User → API Server → Redis Queue → Engine (in-memory orderbook)  
+                                      ↓  
+                                 Redis Pub/Sub  
+                                   ↙     ↘  
+                    WebSocket Server   DB Processor  
+                           ↓                ↓  
+                        User          TimescaleDB  
 
 <img width="3222" height="1582" alt="image" src="https://github.com/user-attachments/assets/cee363f3-1ed7-479b-96b3-98831d3b38fe" />
 
