@@ -4,7 +4,7 @@ A high-performance cryptocurrency exchange platform with real-time trading capab
 Full Website:   
 
 
-CryptoExchange is split up into multiple separate deployables: a web client, API server, Engine, WebSocket server, DB Processor, and a market maker.  
+CryptoExchange is split up into multiple separate deployables: `a web client`, `API server, Engine`, `WebSocket server`, `DB Processor`, and `a market maker`.  
 
 ## How to run the application:
 Navigate to the every directory and run: 
