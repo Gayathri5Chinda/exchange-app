@@ -24,28 +24,51 @@ yarn test
 ## API Server
 ### Tech Used: 
 Express, Node.js    
+
+The API server acts as the main HTTP interface for users to interact with the exchange through the browser. When a user places an order via POST /api/v1/order, the API server validates and pushes it to a Redis queue for the Engine to process.
+
 ### Data Flow:    
-When a user places an order through the API, the request is validated and authenticated. The order details are then pushed to a Redis queue where the Engine picks it up for processing. Once the Engine processes the order, it publishes the result back through Redis pub/sub, which the API server listens to in order to respond to the client. For real-time updates, users are directed to subscribe via the WebSocket server.  
+- Browser sends POST /api/v1/order with order details
+- API Server validates the order and pushes it to Redis Queue
+- Engine processes the order and publishes the result via Redis Pub/Sub
+- API Server receives the execution result (executedQuantity, fills) and responds to the browser 
 
 ## Engine
 ### Tech Used: 
 Node.js, Redis  
 
-The Engine is the heart of the exchange, responsible for maintaining orderbooks for various trading pairs and executing trades. It stores user balances and open orders entirely in memory for blazing-fast order matching.
+The Engine is the heart of the exchange, responsible for maintaining in-memory orderbooks for various trading pairs (like SOL_USDC) and executing trades. It stores user balances and open orders entirely in memory for blazing-fast order matching.
+Redis serves dual purposes:
+
+1. **Message Queue** - receives orders from the API
+2. **Pub/Sub** - broadcasts trade executions, ticker updates, and orderbook depth
+
 ### Data Flow:  
-The Engine continuously listens to Redis queues for incoming orders. When an order arrives, it's matched against the existing orderbook using a price-time priority algorithm. If a match is found, the trade is executed immediately, balances are updated in memory, and the trade details are published to Redis pub/sub. The DB Processor picks up these events for persistence, while the WebSocket server broadcasts them to connected clients.  
+The Engine processes orders from Redis Queue and when trades are executed:
+- Publishes trade_created events (price: 200.1, quantity: 5) to a Redis Queue for the Database Processor
+- Publishes real-time updates to Redis Pub/Sub channels:
+  - `trade@SOL_USDC` - individual trade executions
+  - `ticker@SOL_USDC` - price ticker updates
+  - `depth@SOL_USDC` - orderbook depth changes
+- Sends execution confirmations back to the API (executedQuantity: 5, fills: [])
 
 ## WebSocket Server
 ### Tech Used: 
 WebSocket (ws library), Node.js, Redis  
 
-Real-time data is essential for any trading platform. The WebSocket server allows users to subscribe to live orderbook updates, recent trades, and their own order status changes. The native ws library was chosen for its performance and low overhead.  
+Real-time data is essential for any trading platform. The WebSocket server subscribes to Redis Pub/Sub channels and streams updates directly to the browser for:
+- `trade@SOL_USDC` - live trade feed
+- `ticker@SOL_USDC` - real-time price updates
+- `depth@SOL_USDC` - orderbook depth changes
+
 ### Data Flow:  
-When a user connects to the WebSocket server, they can subscribe to specific channels (e.g., orderbook.BTC-USD, trades.ETH-USD). The WebSocket server listens to the corresponding Redis pub/sub channels and forwards any messages to subscribed clients in real-time. This architecture ensures that all connected users receive updates simultaneously as soon as the Engine processes them.  
+The Engine publishes events to Redis Pub/Sub → WebSocket Server subscribes to these channels → Browser receives real-time updates via WebSocket connection.
 
 ## DB Processor
 ### Tech Used: 
-Node.js, Redis, TimescaleDB  
+Node.js, Redis, TimescaleDB 
+
+It consumes trade events from a Redis Queue (separate from the order queue) and writes them to TimescaleDB
 ### Data Flow:  
 The DB Processor listens to Redis pub/sub channels for trade executions, order placements, cancellations, and balance updates. These events are batched and written to TimescaleDB. Additionally, the DB Processor generates kline (candlestick) data by aggregating trades into time buckets (1m, 5m, 1h, etc.), which are used by the frontend for charting.
 
@@ -56,24 +79,13 @@ Node.js, Redis
 The market maker periodically generates random orders within a configured spread around the mid-market price. These orders are pushed to Redis queues, picked up by the Engine, and matched like any other order. This creates a more realistic trading environment and allows us to test the system under load.
 
 ## Redis
-### Tech Used: 
-Redis
-Redis serves two critical functions in the architecture:   
-### Message Queue: 
-The API server and market maker push orders to Redis queues, which the Engine consumes. This decouples the services and allows for asynchronous processing.  
-Pub/Sub: The Engine publishes trade executions and orderbook updates to Redis channels. The WebSocket server and DB Processor subscribe to these channels to broadcast updates and persist data respectively.  
+Redis serves three critical functions:  
+- `Order Queue` - API → Engine (order requests)
+- `Event Queue` - Engine → Database Processor (trade_created events)
+- `Pub/Sub` - Engine → WebSocket/API (real-time updates and execution confirmations)
 
 ## TimescaleDB
-### Tech Used: 
-TimescaleDB (PostgreSQL extension)  
-TimescaleDB stores all historical trading data, including:  
-
-Trade executions  
-Order history  
-Balance changes  
-Kline/candlestick data  
-
-The DB Processor aggregates trades into time-bucketed klines (1 minute, 5 minute, 1 hour, etc.) using TimescaleDB's continuous aggregates feature. This allows the frontend to efficiently query and display price charts without computing aggregations on the fly.  
+Stores all historical trading data with timestamps, allowing the Database Processor to create time-bucketed aggregations for price charts and analytics.  
 
 ### Architecture Overview
 
